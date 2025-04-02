@@ -1,5 +1,6 @@
 from matplotlib import pyplot as plt
 import numpy as np
+import torch
 
 class PlotResults:
     def __init__(
@@ -53,19 +54,22 @@ def show_epsilon_decay(epsilon_start, epsilon_end, epsilon_decay):
 def preprocess_state(state):
     """Preprocess the state for the CNN model"""
     # Input shape: (4, 96, 96, 3) - 4 stacked RGB frames
+
+    if not isinstance(state, torch.Tensor):
+        state = torch.tensor(state, dtype=torch.float32)
+
+    n_frames, height, width, channels = state.shape
     
-    # Convert each frame to grayscale
-    # Apply RGB->grayscale conversion to the RGB channel (last dimension)
-    grayscale_frames = np.zeros((state.shape[0], state.shape[1], state.shape[2]))
-    for i in range(state.shape[0]):
-        grayscale_frames[i] = np.dot(state[i, :, :, :3], [0.2989, 0.5870, 0.1140])
+    grayscale_frames = torch.zeros((n_frames, height, width), dtype=torch.float32)
+    rgb_weights = torch.tensor([0.2989, 0.5870, 0.1140], dtype=torch.float32)
+    for i in range(n_frames):
+        # Dot product along the RGB channels
+        grayscale_frames[i] = torch.sum(state[i, :, :, :3] * rgb_weights, dim=2)
     
     # Transpose from (4, 96, 96) to (96, 96, 4)
-    transposed = np.transpose(grayscale_frames, (1, 2, 0))
-    
+    transposed = grayscale_frames.permute(1, 2, 0)
     normalized = transposed / 255.0
-    
-    return normalized.astype(np.float32)
+    return normalized
 
 
 def show_frame(state):

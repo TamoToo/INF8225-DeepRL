@@ -74,9 +74,9 @@ class DQNAgent(Agent):
 
     def select_action(self, state):
         if np.random.rand() < self.epsilon:
-            return np.random.choice(self.action_dim)
-        state = torch.tensor(state, dtype=torch.float).unsqueeze(0).to(self.device)
-        return torch.argmax(self.q_network(state)).item()
+            return torch.tensor(np.random.choice(self.action_dim))
+        state = state.unsqueeze(0).to(self.device)
+        return torch.argmax(self.q_network(state))
     
     def store_transition(self, state, action, next_state, reward, done):
         self.memory.store(state, action, next_state, reward, done)
@@ -85,13 +85,8 @@ class DQNAgent(Agent):
         if len(self.memory) < self.batch_size:
             return
 
-        states, actions, next_states, rewards, dones = self.memory.sample(self.batch_size)
-        states = torch.tensor(states).to(self.device)
-        actions = torch.tensor(actions).to(self.device)
-        next_states = torch.tensor(next_states).to(self.device)
-        rewards = torch.tensor(rewards).to(self.device)
-        dones = torch.tensor(dones).to(self.device)
-    
+        states, actions, next_states, rewards, dones = self.memory.sample(self.batch_size, self.device)
+
         current_q = self.q_network(states).gather(1, actions.unsqueeze(1)).squeeze(1)
         with torch.no_grad():
             next_q = self.target_network(next_states)
@@ -113,4 +108,3 @@ class DQNAgent(Agent):
 
     def update_epsilon(self):
         self.epsilon = max(self.epsilon_min, self.epsilon * (1 - self.epsilon_decay))
-        # print(f"Epsilon: {self.epsilon:.4f}")

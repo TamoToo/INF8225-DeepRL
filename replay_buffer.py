@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 
 # Create the Replay Buffer
 class ReplayBuffer(object):
@@ -9,11 +10,11 @@ class ReplayBuffer(object):
             action_space: int
     ):
         self.size = capacity
-        self.states = np.zeros((self.size, *input_shape), dtype=np.float32)
-        self.actions = np.zeros(self.size, dtype=np.int64)
-        self.next_states = np.zeros((self.size, *input_shape), dtype=np.float32)
-        self.rewards = np.zeros(self.size, dtype=np.float32)
-        self.dones = np.zeros(self.size, dtype=bool)
+        self.states = torch.zeros((self.size, *input_shape), dtype=torch.float32)
+        self.actions = torch.zeros(self.size, dtype=torch.int64)
+        self.next_states = torch.zeros((self.size, *input_shape), dtype=torch.float32)
+        self.rewards = torch.zeros(self.size, dtype=torch.float32)
+        self.dones = torch.zeros(self.size, dtype=torch.bool)
 
         # Circular buffer
         self.ptr = 0
@@ -30,7 +31,7 @@ class ReplayBuffer(object):
         self.ptr = (self.ptr + 1) % self.size
         self.current_size = min(self.current_size + 1, self.size)
 
-    def sample(self, batch_size):
+    def sample(self, batch_size, device=None):
         indices = np.random.choice(self.current_size, batch_size, replace=False)
 
         states = self.states[indices]
@@ -38,6 +39,13 @@ class ReplayBuffer(object):
         next_states = self.next_states[indices]
         rewards = self.rewards[indices]
         dones = self.dones[indices]
+
+        if device is not None:
+            states = states.to(device)
+            actions = actions.to(device)
+            next_states = next_states.to(device)
+            rewards = rewards.to(device)
+            dones = dones.to(device)
 
         return states, actions, next_states, rewards, dones
     
