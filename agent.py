@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.optim as optim
 import numpy as np
 from dqn import DQN, DQN_CNN
+from ddpg import DDPGActor, DDPGCritic
+from utils import OrnsteinUhlenbeckActionNoise
 from replay_buffer import ReplayBuffer
 
 
@@ -12,18 +14,11 @@ class Agent:
             self,
             batch_size: int,
             gamma: float,
-            epsilon_start: float,
-            epsilon_min: float,
-            epsilon_decay: float,
             tau: float,
             lr: float,
     ):
         self.batch_size = batch_size
         self.gamma = gamma
-        self.epsilon_start = epsilon_start
-        self.epsilon_min = epsilon_min
-        self.epsilon = epsilon_start
-        self.epsilon_decay = epsilon_decay
         self.tau = tau
         self.lr = lr
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -50,9 +45,13 @@ class DQNAgent(Agent):
             action_space: int,
             observation_space: int
     ):
-        super().__init__(batch_size, gamma, epsilon_start, epsilon_min, epsilon_decay, tau, lr)
+        super().__init__(batch_size, gamma, tau, lr)
         self.action_dim = action_space
         self.obs_dim = observation_space
+        self.epsilon_start = epsilon_start
+        self.epsilon_min = epsilon_min
+        self.epsilon = epsilon_start
+        self.epsilon_decay = epsilon_decay
 
         # Initialize the DQN networks
         if not model:
@@ -90,7 +89,7 @@ class DQNAgent(Agent):
         current_q = self.q_network(states).gather(1, actions.unsqueeze(1)).squeeze(1)
         with torch.no_grad():
             next_q = self.target_network(next_states)
-            next_q[dones] = 0.0
+            next_q[dones] = 0.0 # Set Q value to 0 for terminal states
             next_q = next_q.max(dim=1)[0]
             target_q = rewards + self.gamma * next_q
 
@@ -108,3 +107,100 @@ class DQNAgent(Agent):
 
     def update_epsilon(self):
         self.epsilon = max(self.epsilon_min, self.epsilon * (1 - self.epsilon_decay))
+
+
+
+class DDPGAgent(Agent):
+    def __init__(
+            self,
+            model: str,
+            batch_size: int,
+            gamma: float,
+            tau: float,
+            lr: float,
+            memory_capacity: int,
+            action_space: int,
+            observation_space: int
+    ):
+        super().__init__(batch_size, gamma, tau, lr)
+        self.action_dim = action_space
+        self.obs_dim = observation_space
+
+        # Initialize the DDPG networks
+        if model == 'DDPG':
+            if isinstance(observation_space, tuple):
+                observation_space = observation_space[0]
+            if isinstance(action_space, tuple):
+                action_space = action_space[0]
+            self.actor = DDPGActor(action_space, observation_space).to(self.device)
+            self.actor_target = DDPGActor(action_space, observation_space).to(self.device)
+            self.critic = DDPGCritic(action_space, observation_space).to(self.device)
+            self.critic_target = DDPGCritic(action_space, observation_space).to(self.device)
+        # elif model == 'DDPG_CNN':
+        #     self.actor = DDPGActor(action_space, observation_space).to(self.device)
+        #     self.actor_target = DDPGActor(action_space, observation_space).to(self.device)
+        #     self.critic = DDPGCritic(action_space, observation_space).to(self.device)
+        #     self.critic_target = DDPGCritic(action_space, observation_space).to(self.device)
+
+        self.action_noise = OrnsteinUhlenbeckActionNoise(mu=np.zeros(action_space))
+
+        # Initialize the optimizer and loss function
+        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=lr)
+        self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=lr)
+        self.loss = nn.MSELoss()
+        self.memory = ReplayBuffer(memory_capacity, self.obs_dim, self.action_dim, action_type='continuous')
+
+
+    def select_action(self, state):
+        self.actor.eval()
+        state = state.unsqueeze(0).to(self.device)
+        # state = state.to(self.device)
+        action = self.actor(state)
+        action += torch.tensor(self.action_noise.sample(), dtype=torch.float32).to(self.device)
+
+        self.actor.train()
+        return action
+    
+    def store_transition(self, state, action, next_state, reward, done):
+        self.memory.store(state, action, next_state, reward, done)
+
+    def train(self):
+        if len(self.memory) < self.batch_size:
+            return
+
+        states, actions, next_states, rewards, dones = self.memory.sample(self.batch_size, self.device)
+        
+        self.actor_target.eval()
+        self.critic_target.eval()
+        self.critic.eval()
+        # Critic update
+        with torch.no_grad():
+            target_actions = self.actor_target(next_states)
+            # print(next_states.shape, target_actions.shape)
+            target_q = self.critic_target(next_states, target_actions)
+            target_q[dones] = 0.0 # Set Q value to 0 for terminal states
+            target_q = rewards + self.gamma * target_q
+
+        # print(states.shape, actions.unsqueeze(1).shape)
+        current_q = self.critic(states, actions.unsqueeze(1))
+
+        self.critic.train()
+        critic_loss = self.loss(current_q, target_q)
+        self.critic_optimizer.zero_grad()
+        critic_loss.backward()
+        self.critic_optimizer.step()
+
+        # Actor update
+        self.critic.eval()
+        actor_loss = -self.critic(states, self.actor(states)).mean()
+        self.actor.train()
+        self.actor_optimizer.zero_grad()
+        actor_loss.backward()
+        self.actor_optimizer.step()
+
+        # Soft update of the target networks
+        for target_param, param in zip(self.actor_target.parameters(), self.actor.parameters()):
+            target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+
+        for target_param, param in zip(self.critic_target.parameters(), self.critic.parameters()):
+            target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)

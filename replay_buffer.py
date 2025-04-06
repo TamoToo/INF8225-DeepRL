@@ -7,11 +7,15 @@ class ReplayBuffer(object):
             self,
             capacity: int,
             input_shape: tuple,
-            action_space: int
+            action_space: int,
+            action_type: str = 'discrete'
     ):
         self.size = capacity
         self.states = torch.zeros((self.size, *input_shape), dtype=torch.float32)
-        self.actions = torch.zeros(self.size, dtype=torch.int64)
+        if action_type == 'discrete':
+            self.actions = torch.zeros(self.size, dtype=torch.int64)
+        elif action_type == 'continuous':
+            self.actions = torch.zeros(self.size, dtype=torch.float32)
         self.next_states = torch.zeros((self.size, *input_shape), dtype=torch.float32)
         self.rewards = torch.zeros(self.size, dtype=torch.float32)
         self.dones = torch.zeros(self.size, dtype=torch.bool)

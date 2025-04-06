@@ -7,15 +7,17 @@ class DQN(nn.Module):
     def __init__(
             self,
             action_space: int,
-            observation_space: int
+            observation_space: int,
+            hidden_dim_1: int = 128,
+            hidden_dim_2: int = 128
     ):
         super().__init__()
         self.network = nn.Sequential(
-            nn.Linear(observation_space, 128),
+            nn.Linear(observation_space, hidden_dim_1),
             nn.ReLU(),
-            nn.Linear(128, 128),
+            nn.Linear(hidden_dim_1, hidden_dim_2),
             nn.ReLU(),
-            nn.Linear(128, action_space)
+            nn.Linear(hidden_dim_2, action_space)
         )
 
     def forward(self, x):
@@ -23,7 +25,11 @@ class DQN(nn.Module):
     
 
 class DQN_CNN(nn.Module):
-    def __init__(self, action_space: int, observation_space: int):
+    def __init__(
+            self,
+            action_space: int,
+            observation_space: int
+    ):
         super().__init__()
         width, height, frames = observation_space
         self.n_frames = frames
