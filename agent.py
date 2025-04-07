@@ -12,16 +12,17 @@ from replay_buffer import ReplayBuffer
 class Agent:
     def __init__(
             self,
+            device: str,
             batch_size: int,
             gamma: float,
             tau: float,
             lr: float,
     ):
+        self.device = device
         self.batch_size = batch_size
         self.gamma = gamma
         self.tau = tau
         self.lr = lr
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     def select_action(self, state):
         raise NotImplementedError
@@ -34,6 +35,7 @@ class DQNAgent(Agent):
     def __init__(
             self,
             model: str,
+            device: str,
             batch_size: int,
             gamma: float,
             epsilon_start: float,
@@ -45,7 +47,7 @@ class DQNAgent(Agent):
             action_space: int,
             observation_space: int
     ):
-        super().__init__(batch_size, gamma, tau, lr)
+        super().__init__(device, batch_size, gamma, tau, lr)
         self.action_dim = action_space
         self.obs_dim = observation_space
         self.epsilon_start = epsilon_start
@@ -114,6 +116,7 @@ class DDPGAgent(Agent):
     def __init__(
             self,
             model: str,
+            device: str,
             batch_size: int,
             gamma: float,
             tau: float,
@@ -122,7 +125,7 @@ class DDPGAgent(Agent):
             action_space: int,
             observation_space: int
     ):
-        super().__init__(batch_size, gamma, tau, lr)
+        super().__init__(device, batch_size, gamma, tau, lr)
         self.action_dim = action_space
         self.obs_dim = observation_space
 
@@ -170,30 +173,30 @@ class DDPGAgent(Agent):
 
         states, actions, next_states, rewards, dones = self.memory.sample(self.batch_size, self.device)
         
+        # Target networks should always be in eval mode
         self.actor_target.eval()
         self.critic_target.eval()
-        self.critic.eval()
-        # Critic update
+
         with torch.no_grad():
             target_actions = self.actor_target(next_states)
             # print(next_states.shape, target_actions.shape)
             target_q = self.critic_target(next_states, target_actions)
             target_q[dones] = 0.0 # Set Q value to 0 for terminal states
-            target_q = rewards + self.gamma * target_q
+            target_q = rewards.unsqueeze(1) + self.gamma * target_q
 
+        # Critic update
+        self.critic.train() # Switch to train mode for critic update
         # print(states.shape, actions.unsqueeze(1).shape)
-        current_q = self.critic(states, actions.unsqueeze(1))
-
-        self.critic.train()
+        current_q = self.critic(states, actions.unsqueeze(1)) 
         critic_loss = self.loss(current_q, target_q)
         self.critic_optimizer.zero_grad()
         critic_loss.backward()
         self.critic_optimizer.step()
 
         # Actor update
-        self.critic.eval()
+        self.actor.train() # Switch to train mode for actor update
+        self.critic.eval() # Ensure critic is in eval mode for actor update
         actor_loss = -self.critic(states, self.actor(states)).mean()
-        self.actor.train()
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
         self.actor_optimizer.step()

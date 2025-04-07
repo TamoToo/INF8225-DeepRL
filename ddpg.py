@@ -23,10 +23,10 @@ class DDPGActor(nn.Module):
         self.fc2_dim = hidden_dim_2
         self.network = nn.Sequential(
             nn.Linear(self.observation_space, self.fc1_dim),
-            nn.LayerNorm(self.fc1_dim),
+            nn.BatchNorm1d(self.fc1_dim),
             nn.ReLU(),
             nn.Linear(self.fc1_dim, self.fc2_dim),
-            nn.LayerNorm(self.fc2_dim),
+            nn.BatchNorm1d(self.fc2_dim),
             nn.ReLU(),
             nn.Linear(self.fc2_dim, self.action_space),
             nn.Tanh() # Output layer with Tanh activation for continuous action space [-1, 1]
@@ -69,9 +69,9 @@ class DDPGCritic(nn.Module):
         self.fc2_dim = hidden_dim_2
 
         self.fc1 = nn.Linear(self.observation_space, self.fc1_dim)
-        self.bn1 = nn.LayerNorm(self.fc1_dim)
+        self.bn1 = nn.BatchNorm1d(self.fc1_dim)
         self.fc2 = nn.Linear(self.fc1_dim, self.fc2_dim)
-        self.bn2 = nn.LayerNorm(self.fc2_dim)
+        self.bn2 = nn.BatchNorm1d(self.fc2_dim)
         self.fc1_action = nn.Linear(self.action_space, self.fc2_dim)
         self.fc3 = nn.Linear(self.fc2_dim, 1)
 
