@@ -37,14 +37,12 @@ class PlotResults:
 class OrnsteinUhlenbeckActionNoise(object):
     def __init__(
             self, 
-            # action_dim,
-            mu = 0,
+            mu,
             theta = 0.15,
             sigma = 0.2,
             dt = 1e-2,
             x0 = None
     ):
-        # self.action_dim = action_dim
         self.mu = mu
         self.theta = theta
         self.sigma = sigma
