@@ -1,4 +1,4 @@
-class Agent(object):
+class AgentAbstract(object):
     def __init__(
             self,
             name: str,

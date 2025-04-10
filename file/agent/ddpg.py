@@ -1,6 +1,6 @@
 from ddpg.actor import Actor
 from ddpg.critic import Critic
-from interface.agent import Agent
+from interface.agent import AgentAbstract
 from utils.ornstein_uhlenbeck_action_noise import OrnsteinUhlenbeckActionNoise
 from utils.replay_buffer import ReplayBuffer
 
@@ -10,7 +10,7 @@ import torch.nn as nn
 import torch.optim as optim
 
 
-class Agent(Agent):
+class Agent(AgentAbstract):
     def __init__(
         self,
         name: str,
