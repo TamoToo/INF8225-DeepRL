@@ -4,33 +4,43 @@ from utils.reward_logger import RewardLogger
 from gymnasium.wrappers import RecordVideo, NumpyToTorch
 
 import gymnasium as gym
-import matplotlib.pyplot as plt
 import numpy as np
 import torch
+
+DQN_FIGURES_DIR = "figures/dqn/"
+DDPG_FIGURES_DIR = "figures/ddpg/"
+DQN_VIDEOS_DIR = "videos/dqn/"
+DDPG_VIDEOS_DIR = "videos/ddpg/"
+
+EPISODES_INTERVAL_OF_PRINT = 10
+EPISODES_INTERVAL_OF_VIDEO = 50
 
 
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    n_episodes = 200
-    testMountainCarWithDQN(device, n_episodes=n_episodes)
-    testMountainCarWithDDPG(device, n_episodes=n_episodes)
+    testMountainCar(device, n_episodes=200)
 
 
-def testMountainCarWithDQN(device: torch.device, n_episodes: int = 200):
-    env = gym.make('MountainCar-v0', render_mode='rgb_array')
+def testMountainCar(device: torch.device, n_episodes: int = 200):
+    testEnvironmentWithDQN("MountainCar-v0", device, n_episodes=n_episodes)
+    testEnvironmentWithDDPG("MountainCarContinuous-v0", device, n_episodes=n_episodes)
+
+
+def testEnvironmentWithDQN(env_name: str, device: torch.device, n_episodes: int = 200):
+    env = gym.make(env_name, render_mode="rgb_array")
     env = RecordVideo(
         env,
-        video_folder='videos/dqn/',
-        episode_trigger=lambda episode_id: episode_id % 50 == 0,
-        name_prefix="mountain-car"
+        video_folder=DQN_VIDEOS_DIR,
+        episode_trigger=lambda episode_id: episode_id % EPISODES_INTERVAL_OF_VIDEO == 0,
+        name_prefix=env_name
     )
     
     env = NumpyToTorch(env, device)
 
     agent = DQNAgent(
-        name='DQN-MountainCar',
+        name=f"DQN-{env_name}",
         device=device,
         batch_size=64,
         gamma=0.99,
@@ -62,26 +72,26 @@ def testMountainCarWithDQN(device: torch.device, n_episodes: int = 200):
 
         reward_logger.add(total_reward)
 
-        if episode % 10 == 0:
-            print(f"Episode {episode + 1}/{n_episodes}, Average Reward: {np.mean(reward_logger.get_rewards()[-10:]):.2f}, Epsilon: {agent.epsilon:.2f}")
+        if episode % EPISODES_INTERVAL_OF_PRINT == 0:
+            print(f"Episode {episode + 1}/{n_episodes}, Average Reward: {np.mean(reward_logger.get_rewards()[-EPISODES_INTERVAL_OF_PRINT:]):.2f}, Epsilon: {agent.epsilon:.2f}")
 
-    reward_logger.plot_rewards("figures/dqn/mountain-car.png")
-    reward_logger.plot_rewards_smooth("figures/dqn/mountain-car-smooth.png")
+    reward_logger.plot_rewards(f"{DQN_FIGURES_DIR}{env_name}.png")
+    reward_logger.plot_rewards_smooth(f"{DQN_FIGURES_DIR}{env_name}-smooth.png")
 
 
-def testMountainCarWithDDPG(device: torch.device, n_episodes: int = 200):
-    env = gym.make('MountainCarContinuous-v0', render_mode='rgb_array')
+def testEnvironmentWithDDPG(env_name: str, device: torch.device, n_episodes: int = 200):
+    env = gym.make(env_name, render_mode="rgb_array")
     env = RecordVideo(
         env,
-        video_folder='videos/ddpg/',
-        episode_trigger=lambda episode_id: episode_id % 50 == 0,
-        name_prefix="mountain-car"
+        video_folder=DDPG_VIDEOS_DIR,
+        episode_trigger=lambda episode_id: episode_id % EPISODES_INTERVAL_OF_VIDEO == 0,
+        name_prefix=env_name
     )
     
     env = NumpyToTorch(env, device)
 
     agent = DDPGAgent(
-        name='DDPG-MountainCar',
+        name=f"DDPG-{env_name}",
         device=device,
         batch_size=64,
         gamma=0.99,
@@ -112,11 +122,11 @@ def testMountainCarWithDDPG(device: torch.device, n_episodes: int = 200):
 
         reward_logger.add(total_reward)
 
-        if episode % 10 == 0:
-            print(f"Episode {episode}, Average Reward: {np.mean(reward_logger.get_rewards()[-5:]):.2f}")
+        if episode % EPISODES_INTERVAL_OF_PRINT == 0:
+            print(f"Episode {episode}, Average Reward: {np.mean(reward_logger.get_rewards()[-EPISODES_INTERVAL_OF_PRINT:]):.2f}")
 
-    reward_logger.plot_rewards("figures/ddpg/mountain-car.png")
-    reward_logger.plot_rewards_smooth("figures/ddpg/mountain-car-smooth.png")
+    reward_logger.plot_rewards(f"{DDPG_FIGURES_DIR}{env_name}.png")
+    reward_logger.plot_rewards_smooth(f"{DDPG_FIGURES_DIR}{env_name}-smooth.png")
 
 
 if __name__ == "__main__":

@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -20,7 +22,7 @@ class RewardLogger(object):
         plt.xlabel("Episode #")
         plt.ylabel("Reward")
         plt.grid(True)
-        plt.show(file_name)
+        plt.savefig(file_name)
     
     def plot_rewards_smooth(self, file_name, window_length=50, figsize=(10, 5)):
         plt.figure(figsize=figsize)
