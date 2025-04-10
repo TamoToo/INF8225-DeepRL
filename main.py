@@ -22,6 +22,7 @@ def main():
 
     testCartPole(device, n_episodes=200)
     testMountainCar(device, n_episodes=200)
+    testLunarLander(device, n_episodes=200)
 
 
 def testCartPole(device: torch.device, n_episodes: int = 200):
@@ -30,6 +31,10 @@ def testCartPole(device: torch.device, n_episodes: int = 200):
 def testMountainCar(device: torch.device, n_episodes: int = 200):
     testEnvironmentWithDQN("MountainCar-v0", device, n_episodes=n_episodes)
     testEnvironmentWithDDPG("MountainCarContinuous-v0", device, n_episodes=n_episodes)
+
+def testLunarLander(device: torch.device, n_episodes: int = 200):
+    testEnvironmentWithDQN("LunarLander-v2", device, n_episodes=n_episodes)
+    testEnvironmentWithDDPG("LunarLanderContinuous-v2", device, n_episodes=n_episodes)
 
 
 def testEnvironmentWithDQN(env_name: str, device: torch.device, n_episodes: int = 200, model_type: str = "DQN"):

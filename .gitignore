@@ -1,5 +1,5 @@
 __pycache__
-*/output/figures/ddpg/
-*/output/figures/dqn/
-*/output/videos/ddpg/
-*/output/videos/dqn/
+output/figures/ddpg/
+output/figures/dqn/
+output/videos/ddpg/
+output/videos/dqn/
