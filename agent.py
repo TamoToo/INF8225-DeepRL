@@ -6,9 +6,8 @@ from dqn import DQN, DQN_CNN
 from ddpg import DDPGActor, DDPGCritic
 from utils import OrnsteinUhlenbeckActionNoise
 from replay_buffer import ReplayBuffer
+import os
 
-
-# Create the DQN Agent
 class Agent:
     def __init__(
             self,
@@ -27,8 +26,25 @@ class Agent:
     def select_action(self, state):
         raise NotImplementedError
     
+    def store_transition(self, state, action, next_state, reward, done):
+        raise NotImplementedError
+    
+    def update_network(self, network, target_network):
+        for target_param, param in zip(target_network.parameters(), network.parameters()):
+            target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+    
     def train(self):
         raise NotImplementedError
+    
+    def save_config(self):
+        config = {
+            'name': self.path.split('/')[-1],
+            'device': self.device,
+            'batch_size': self.batch_size,
+            'gamma': self.gamma,
+            'tau': self.tau
+        }
+        return config
     
     def save_models(self):
         raise NotImplementedError
@@ -61,6 +77,7 @@ class DQNAgent(Agent):
         self.epsilon_min = epsilon_min
         self.epsilon = epsilon_start
         self.epsilon_decay = epsilon_decay
+        self.memory_capacity = memory_capacity
         self.lr = lr
 
         # Initialize the DQN networks
@@ -79,10 +96,10 @@ class DQNAgent(Agent):
         # Initialize the optimizer, loss function, and replay buffer
         self.optimizer = optim.Adam(self.q_network.parameters(), lr=self.lr)
         self.loss = nn.MSELoss()
-        self.memory = ReplayBuffer(memory_capacity, self.obs_dim, self.action_dim)
+        self.memory = ReplayBuffer(self.memory_capacity, self.obs_dim, self.action_dim)
 
-    def select_action(self, state):
-        if np.random.rand() < self.epsilon:
+    def select_action(self, state, eval_mode=False):
+        if not eval_mode and np.random.rand() < self.epsilon:
             return torch.tensor(np.random.choice(self.action_dim))
         state = state.unsqueeze(0).to(self.device)
         return torch.argmax(self.q_network(state))
@@ -99,9 +116,8 @@ class DQNAgent(Agent):
         current_q = self.q_network(states).gather(1, actions.unsqueeze(1)).squeeze(1)
         with torch.no_grad():
             next_q = self.target_network(next_states)
-            next_q[dones] = 0.0 # Set Q value to 0 for terminal states
             next_q = next_q.max(dim=1)[0]
-            target_q = rewards + self.gamma * next_q
+            target_q = rewards + self.gamma * next_q * (1 - dones.float())
 
         loss = self.loss(current_q, target_q)
 
@@ -112,15 +128,30 @@ class DQNAgent(Agent):
         self.update_epsilon()
 
         # Soft update of the target network weights
-        for target_param, param in zip(self.target_network.parameters(), self.q_network.parameters()):
-            target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+        self.update_network(self.q_network, self.target_network)
 
     def update_epsilon(self):
         self.epsilon = max(self.epsilon_min, self.epsilon * (1 - self.epsilon_decay))
 
     def save_models(self):
+        os.makedirs(os.path.dirname(self.path), exist_ok=True)
+
         torch.save(self.q_network.state_dict(), f'{self.path}_dqn.pth')
         torch.save(self.target_network.state_dict(), f'{self.path}_dqn_target.pth')
+
+        config = self.save_config()
+        config.update({
+            'model_type': 'DQN_CNN' if isinstance(self.q_network, DQN_CNN) else 'DQN',
+            'epsilon': self.epsilon,
+            'epsilon_start': self.epsilon_start,
+            'epsilon_min': self.epsilon_min,
+            'epsilon_decay': self.epsilon_decay,
+            'lr': self.lr,
+            'memory_capacity': self.memory_capacity,
+            'action_space': self.action_dim,
+            'observation_space': self.obs_dim
+        })
+        torch.save(config, f'{self.path}_config.pth')
 
     def load_models(self):
         self.q_network.load_state_dict(torch.load(f'{self.path}_dqn.pth'))
@@ -133,6 +164,34 @@ class DQNAgent(Agent):
     def train_mode(self):
         self.q_network.train()
         self.target_network.train()
+
+    @staticmethod
+    def load_agent(name, device, eval_mode=True):
+        """Load agent from saved configuration"""
+        path = f'models/{name}'
+        config = torch.load(f'{path}_config.pth')
+        
+        agent = DQNAgent(
+            model_type=config['model_type'],
+            name=config['name'],
+            device=device,
+            batch_size=config['batch_size'],
+            gamma=config['gamma'],
+            tau=config['tau'],
+            epsilon_start=config['epsilon_start'],
+            epsilon_min=config['epsilon_min'],
+            epsilon_decay=config['epsilon_decay'],
+            lr=config['lr'],
+            memory_capacity=config['memory_capacity'],
+            action_space=config['action_space'],
+            observation_space=config['observation_space']
+        )
+        
+        agent.load_models()
+        if eval_mode:
+            agent.eval_mode()
+        
+        return agent
 
 
 class DDPGAgent(Agent):
@@ -155,6 +214,7 @@ class DDPGAgent(Agent):
         self.obs_dim = observation_space
         self.lr_actor = lr_actor
         self.lr_critic = lr_critic
+        self.memory_capacity = memory_capacity
 
         # Initialize the DDPG networks
         if model_type == 'DDPG':
@@ -178,7 +238,7 @@ class DDPGAgent(Agent):
         self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=self.lr_actor)
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=self.lr_critic)
         self.loss = nn.MSELoss()
-        self.memory = ReplayBuffer(memory_capacity, self.obs_dim, self.action_dim, action_type='continuous')
+        self.memory = ReplayBuffer(self.memory_capacity, self.obs_dim, self.action_dim, action_type='continuous')
 
 
     def select_action(self, state):
@@ -200,21 +260,17 @@ class DDPGAgent(Agent):
             return
 
         states, actions, next_states, rewards, dones = self.memory.sample(self.batch_size, self.device)
-        # print(states.shape, actions.shape, next_states.shape, rewards.shape, dones.shape)
         # Target networks should always be in eval mode
         self.actor_target.eval()
         self.critic_target.eval()
 
         with torch.no_grad():
             target_actions = self.actor_target(next_states)
-            # print(target_actions.shape)
             target_q = self.critic_target(next_states, target_actions)
-            # target_q[dones] = 0.0 # Set Q value to 0 for terminal states
             target_q = rewards.unsqueeze(1) + self.gamma * target_q * (1 - dones.unsqueeze(1).float())
 
         # Critic update
         self.critic.train() # Switch to train mode for critic update
-        # print(states.shape, actions.unsqueeze(1).shape)
         current_q = self.critic(states, actions) 
         critic_loss = self.loss(current_q, target_q)
         self.critic_optimizer.zero_grad()
@@ -230,17 +286,27 @@ class DDPGAgent(Agent):
         self.actor_optimizer.step()
 
         # Soft update of the target networks
-        for target_param, param in zip(self.actor_target.parameters(), self.actor.parameters()):
-            target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
-
-        for target_param, param in zip(self.critic_target.parameters(), self.critic.parameters()):
-            target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+        self.update_network(self.actor, self.actor_target)
+        self.update_network(self.critic, self.critic_target)
 
     def save_models(self):
+        os.makedirs(os.path.dirname(self.path), exist_ok=True)
+
         torch.save(self.actor.state_dict(), f'{self.path}_ddpg_actor.pth')
         torch.save(self.actor_target.state_dict(), f'{self.path}_ddpg_target_actor.pth')
         torch.save(self.critic.state_dict(), f'{self.path}_ddpg_critic.pth')
         torch.save(self.critic_target.state_dict(), f'{self.path}_ddpg_target_critic.pth')
+
+        config = self.save_config()
+        config.update({
+            'model_type': 'DDPG',
+            'lr_actor': self.lr_actor,
+            'lr_critic': self.lr_critic,
+            'memory_capacity': self.memory_capacity,
+            'action_space': self.action_dim,
+            'observation_space': self.obs_dim
+        })
+        torch.save(config, f'{self.path}_config.pth')
 
     def load_models(self):
         self.actor.load_state_dict(torch.load(f'{self.path}_ddpg_actor.pth'))
@@ -259,3 +325,30 @@ class DDPGAgent(Agent):
         self.actor_target.train()
         self.critic.train()
         self.critic_target.train()
+
+    
+    @staticmethod
+    def load_agent(name, device, eval_mode=True):
+        """Load agent from saved configuration"""
+        path = f'models/{name}'
+        config = torch.load(f'{path}_config.pth')
+        
+        agent = DDPGAgent(
+            model_type=config['model_type'],
+            name=config['name'],
+            device=device,
+            batch_size=config['batch_size'],
+            gamma=config['gamma'],
+            tau=config['tau'],
+            lr_actor=config['lr_actor'],
+            lr_critic=config['lr_critic'],
+            memory_capacity=config['memory_capacity'],
+            action_space=config['action_space'],
+            observation_space=config['observation_space']
+        )
+        
+        agent.load_models()
+        if eval_mode:
+            agent.eval_mode()
+        
+        return agent
