@@ -1,5 +1,6 @@
 from agent.ddpg import Agent as DDPGAgent
 from agent.dqn import Agent as DQNAgent
+from utils.reward_logger import RewardLogger
 from gymnasium.wrappers import RecordVideo, NumpyToTorch
 
 import gymnasium as gym
@@ -43,6 +44,7 @@ def testMountainCarWithDQN(device: torch.device, n_episodes: int = 200):
         observation_space=env.observation_space.shape
     )
 
+    reward_logger = RewardLogger()
     for episode in range(n_episodes):
         state, _ = env.reset()
         total_reward = 0
@@ -52,16 +54,19 @@ def testMountainCarWithDQN(device: torch.device, n_episodes: int = 200):
             action = agent.select_action(state)
             next_state, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated
-            if terminated:
-                print("GOAL REACHED at episode", episode)
 
             agent.store_transition(state, action, next_state, reward, done)
             agent.train()
             state = next_state
             total_reward += reward
 
-        if episode % 5 == 0:
-            print(f"Episode {episode + 1}/{n_episodes}, Total Reward: {total_reward}")
+        reward_logger.add(total_reward)
+
+        if episode % 10 == 0:
+            print(f"Episode {episode + 1}/{n_episodes}, Average Reward: {np.mean(reward_logger.get_rewards()[-10:]):.2f}, Epsilon: {agent.epsilon:.2f}")
+
+    reward_logger.plot_rewards("figures/dqn/mountain-car.png")
+    reward_logger.plot_rewards_smooth("figures/dqn/mountain-car-smooth.png")
 
 
 def testMountainCarWithDDPG(device: torch.device, n_episodes: int = 200):
@@ -88,6 +93,7 @@ def testMountainCarWithDDPG(device: torch.device, n_episodes: int = 200):
         observation_space=env.observation_space.shape
     )
 
+    reward_logger = RewardLogger()
     for episode in range(n_episodes):
         state, _ = env.reset()
         total_reward = 0
@@ -98,16 +104,19 @@ def testMountainCarWithDDPG(device: torch.device, n_episodes: int = 200):
             action = action[0].detach()
             next_state, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated
-            if terminated:
-                print("GOAL REACHED at episode", episode)
 
             agent.store_transition(state, action, next_state, reward, done)
             agent.train()
             state = next_state
             total_reward += reward
 
-        if episode % 5 == 0:
-            print(f"Episode {episode + 1}/{n_episodes}, Total Reward: {total_reward}")
+        reward_logger.add(total_reward)
+
+        if episode % 10 == 0:
+            print(f"Episode {episode}, Average Reward: {np.mean(reward_logger.get_rewards()[-5:]):.2f}")
+
+    reward_logger.plot_rewards("figures/ddpg/mountain-car.png")
+    reward_logger.plot_rewards_smooth("figures/ddpg/mountain-car-smooth.png")
 
 
 if __name__ == "__main__":
