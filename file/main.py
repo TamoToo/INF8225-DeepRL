@@ -1,5 +1,5 @@
-from agent.ddpg import Agent as DDPGAgent
-from agent.dqn import Agent as DQNAgent
+from ddpg.ddpg import Agent as DDPGAgent
+from dqn.dqn import Agent as DQNAgent
 from utils.reward_logger import RewardLogger
 from gymnasium.wrappers import RecordVideo, NumpyToTorch
 
@@ -7,10 +7,10 @@ import gymnasium as gym
 import numpy as np
 import torch
 
-DQN_FIGURES_DIR = "figures/dqn/"
-DDPG_FIGURES_DIR = "figures/ddpg/"
-DQN_VIDEOS_DIR = "videos/dqn/"
-DDPG_VIDEOS_DIR = "videos/ddpg/"
+DQN_FIGURES_DIR = "output/figures/dqn/"
+DDPG_FIGURES_DIR = "output/figures/ddpg/"
+DQN_VIDEOS_DIR = "output/videos/dqn/"
+DDPG_VIDEOS_DIR = "output/videos/ddpg/"
 
 EPISODES_INTERVAL_OF_PRINT = 10
 EPISODES_INTERVAL_OF_VIDEO = 50
@@ -20,15 +20,19 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
+    testCartPole(device, n_episodes=200)
     testMountainCar(device, n_episodes=200)
 
+
+def testCartPole(device: torch.device, n_episodes: int = 200):
+    testEnvironmentWithDQN("CartPole-v1", device, n_episodes=n_episodes)
 
 def testMountainCar(device: torch.device, n_episodes: int = 200):
     testEnvironmentWithDQN("MountainCar-v0", device, n_episodes=n_episodes)
     testEnvironmentWithDDPG("MountainCarContinuous-v0", device, n_episodes=n_episodes)
 
 
-def testEnvironmentWithDQN(env_name: str, device: torch.device, n_episodes: int = 200):
+def testEnvironmentWithDQN(env_name: str, device: torch.device, n_episodes: int = 200, model_type: str = "DQN"):
     env = gym.make(env_name, render_mode="rgb_array")
     env = RecordVideo(
         env,
@@ -51,7 +55,8 @@ def testEnvironmentWithDQN(env_name: str, device: torch.device, n_episodes: int 
         lr=1e-3,
         memory_capacity=10000,
         action_space=env.action_space.n,
-        observation_space=env.observation_space.shape
+        observation_space=env.observation_space.shape,
+        model_type=model_type
     )
 
     reward_logger = RewardLogger()
@@ -75,11 +80,12 @@ def testEnvironmentWithDQN(env_name: str, device: torch.device, n_episodes: int 
         if episode % EPISODES_INTERVAL_OF_PRINT == 0:
             print(f"Episode {episode + 1}/{n_episodes}, Average Reward: {np.mean(reward_logger.get_rewards()[-EPISODES_INTERVAL_OF_PRINT:]):.2f}, Epsilon: {agent.epsilon:.2f}")
 
-    reward_logger.plot_rewards(f"{DQN_FIGURES_DIR}{env_name}.png")
-    reward_logger.plot_rewards_smooth(f"{DQN_FIGURES_DIR}{env_name}-smooth.png")
+    plot_reward_name = f"{model_type}-{env_name}-Reward"
+    reward_logger.plot_rewards(f"{DQN_FIGURES_DIR}{plot_reward_name}.png")
+    reward_logger.plot_rewards_smooth(f"{DQN_FIGURES_DIR}{plot_reward_name}Smooth.png")
 
 
-def testEnvironmentWithDDPG(env_name: str, device: torch.device, n_episodes: int = 200):
+def testEnvironmentWithDDPG(env_name: str, device: torch.device, n_episodes: int = 200, model_type: str = "DDPG"):
     env = gym.make(env_name, render_mode="rgb_array")
     env = RecordVideo(
         env,
@@ -125,8 +131,10 @@ def testEnvironmentWithDDPG(env_name: str, device: torch.device, n_episodes: int
         if episode % EPISODES_INTERVAL_OF_PRINT == 0:
             print(f"Episode {episode}, Average Reward: {np.mean(reward_logger.get_rewards()[-EPISODES_INTERVAL_OF_PRINT:]):.2f}")
 
-    reward_logger.plot_rewards(f"{DDPG_FIGURES_DIR}{env_name}.png")
-    reward_logger.plot_rewards_smooth(f"{DDPG_FIGURES_DIR}{env_name}-smooth.png")
+
+    plot_reward_name = f"{model_type}-{env_name}-Reward"
+    reward_logger.plot_rewards(f"{DDPG_FIGURES_DIR}{plot_reward_name}.png")
+    reward_logger.plot_rewards_smooth(f"{DDPG_FIGURES_DIR}{plot_reward_name}Smooth.png")
 
 
 if __name__ == "__main__":

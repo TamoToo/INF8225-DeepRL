@@ -3,12 +3,29 @@ import torch
 import torch.nn as nn
 
 
-class DQN_CNN(nn.Module):
+class DQN(nn.Module):
     def __init__(
             self,
             action_space: int,
-            observation_space: int
+            observation_space: int,
+            hidden_dim_1: int = 128,
+            hidden_dim_2: int = 128
     ):
+        super().__init__()
+        self.network = nn.Sequential(
+            nn.Linear(observation_space, hidden_dim_1),
+            nn.ReLU(),
+            nn.Linear(hidden_dim_1, hidden_dim_2),
+            nn.ReLU(),
+            nn.Linear(hidden_dim_2, action_space)
+        )
+
+    def forward(self, x):
+        return self.network(x)
+
+
+class DQN_CNN(nn.Module):
+    def __init__(self, action_space: int, observation_space: int):
         super().__init__()
         width, height, frames = observation_space
         self.n_frames = frames
@@ -33,6 +50,7 @@ class DQN_CNN(nn.Module):
         """Calculate the size of the flattened features after conv layers"""
         o = torch.zeros(1, *shape)
         o = self.conv_layers(o)
+
         return int(np.prod(o.shape))
     
 
@@ -41,6 +59,8 @@ class DQN_CNN(nn.Module):
         # Convert to PyTorch's expected format (batch, channels, height, width)
         if x.dim() == 4 and x.shape[3] == self.n_frames:  # If in NHWC format with 1 channel
             x = x.permute(0, 3, 1, 2)
+
         x = self.conv_layers(x)
         x = self.fc_layers(x)
+
         return x
