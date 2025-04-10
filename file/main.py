@@ -29,17 +29,16 @@ def testMountainCarWithDQN(device: torch.device, n_episodes: int = 200):
     env = NumpyToTorch(env, device)
 
     agent = DQNAgent(
-        model_type='DQN',
         name='DQN-MountainCar',
         device=device,
         batch_size=64,
         gamma=0.99,
         epsilon_start=0.95,
         epsilon_min=0.01,
-        epsilon_decay=1e-3,
+        epsilon_decay=1e-4,
         tau=0.005,
         lr=1e-3,
-        memory_capacity=100000,
+        memory_capacity=10000,
         action_space=env.action_space.n,
         observation_space=env.observation_space.shape
     )

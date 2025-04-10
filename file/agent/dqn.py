@@ -1,5 +1,4 @@
 from dqn.dqn import DQN
-from dqn.dqn_cnn import DQN_CNN
 from interface.agent import AgentAbstract
 from utils.replay_buffer import ReplayBuffer
 
@@ -12,7 +11,6 @@ import torch.optim as optim
 class Agent(AgentAbstract):
     def __init__(
             self,
-            model_type: str,
             name: str,
             device: str,
             batch_size: int,
@@ -35,19 +33,11 @@ class Agent(AgentAbstract):
         self.epsilon_decay = epsilon_decay
         self.lr = lr
 
-        # Initialize the DQN networks
-        if not model_type:
-            raise ValueError("Model name must be provided")
-        
-        if model_type == 'DQN':
-            if isinstance(observation_space, tuple):
-                observation_space = observation_space[0]
-            self.q_network = DQN(action_space, observation_space).to(self.device)
-            self.target_network = DQN(action_space, observation_space).to(self.device)
-        elif model_type == 'DQN_CNN':
-            self.q_network = DQN_CNN(action_space, observation_space).to(self.device)
-            self.target_network = DQN_CNN(action_space, observation_space).to(self.device)
+        if isinstance(observation_space, tuple):
+            observation_space = observation_space[0]
 
+        self.q_network = DQN(action_space, observation_space).to(self.device)
+        self.target_network = DQN(action_space, observation_space).to(self.device)
         self.target_network.load_state_dict(self.q_network.state_dict())
 
         # Initialize the optimizer, loss function, and replay buffer
