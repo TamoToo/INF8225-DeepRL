@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-# Create the Replay Buffer
+
 class ReplayBuffer(object):
     def __init__(
             self,
@@ -12,10 +12,12 @@ class ReplayBuffer(object):
     ):
         self.size = capacity
         self.states = torch.zeros((self.size, *input_shape), dtype=torch.float32)
+
         if action_type == 'discrete':
             self.actions = torch.zeros(self.size, dtype=torch.int64)
         elif action_type == 'continuous':
             self.actions = torch.zeros((self.size, *action_space), dtype=torch.float32)
+
         self.next_states = torch.zeros((self.size, *input_shape), dtype=torch.float32)
         self.rewards = torch.zeros(self.size, dtype=torch.float32)
         self.dones = torch.zeros(self.size, dtype=torch.bool)
