@@ -35,12 +35,12 @@ class DQN_CNN(nn.Module):
             nn.Conv2d(frames, 16, kernel_size=8, stride=4),
             nn.ReLU(),
             nn.Conv2d(16, 32, kernel_size=4, stride=2),
-            nn.ReLU()
+            nn.ReLU(),
+            nn.Flatten()
         )
         conv_output_size = self._get_conv_output_size((frames, height, width))
         
         self.fc_layers = nn.Sequential(
-            nn.Flatten(),
             nn.Linear(conv_output_size, 256),
             nn.ReLU(),
             nn.Linear(256, action_space)

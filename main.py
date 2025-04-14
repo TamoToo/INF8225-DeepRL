@@ -128,7 +128,7 @@ def testEnvironmentWithDDPG(env_name: str, device: torch.device, n_episodes: int
 
         while not done:
             action = agent.select_action(state)
-            action = action[0].detach()
+            # TODO: Add a way to make sure the action is in the valid range for multiple actions dimension env
             next_state, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated
 

@@ -1,5 +1,5 @@
-from ddpg.actor import Actor
-from ddpg.critic import Critic
+from ddpg.actor import Actor, ActorCNN
+from ddpg.critic import Critic, CriticCNN
 from interface.agent import AgentAbstract
 from utils.ornstein_uhlenbeck_action_noise import OrnsteinUhlenbeckActionNoise
 from utils.replay_buffer import ReplayBuffer
@@ -34,18 +34,30 @@ class Agent(AgentAbstract):
         self.lr_critic = lr_critic
         self.memory_capacity = memory_capacity
 
-        if isinstance(observation_space, tuple):
-            observation_space = observation_space[0]
         if isinstance(action_space, tuple):
             action_space = action_space[0]
 
-        self.actor = Actor(action_space, observation_space).to(self.device)
-        self.actor_target = Actor(action_space, observation_space).to(self.device)
-        self.critic = Critic(action_space, observation_space).to(self.device)
-        self.critic_target = Critic(action_space, observation_space).to(self.device)
+        if model_type == "DDPG":
+            if isinstance(observation_space, tuple):
+                observation_space = observation_space[0]
+
+            self.actor = Actor(action_space, observation_space).to(self.device)
+            self.actor_target = Actor(action_space, observation_space).to(self.device)
+            self.critic = Critic(action_space, observation_space).to(self.device)
+            self.critic_target = Critic(action_space, observation_space).to(self.device)
+
+        elif model_type == "DDPG_CNN":
+            self.actor = ActorCNN(action_space, observation_space).to(self.device)
+            self.actor_target = ActorCNN(action_space, observation_space).to(self.device)
+            self.critic = CriticCNN(action_space, observation_space).to(self.device)
+            self.critic_target = CriticCNN(action_space, observation_space).to(self.device)
+
+
+        # FORGOT THIS, MIGHT BE THE PROBLEM: Initialize the target networks with the same weights as the main networks
+        self.actor_target.load_state_dict(self.actor.state_dict())
+        self.critic_target.load_state_dict(self.critic.state_dict())
 
         self.action_noise = OrnsteinUhlenbeckActionNoise(mu=np.zeros(action_space))
-
         # Initialize the optimizer and loss function
         self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=self.lr_actor)
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=self.lr_critic)
@@ -62,7 +74,7 @@ class Agent(AgentAbstract):
 
         action = torch.clamp(action, -1.0, 1.0)
         self.actor.train()
-        return action
+        return action.squeeze().detach()
     
     def store_transition(self, state, action, next_state, reward, done):
         self.memory.store(state, action, next_state, reward, done)
