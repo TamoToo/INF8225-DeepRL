@@ -74,7 +74,7 @@ class Agent(AgentAbstract):
 
         action = torch.clamp(action, -1.0, 1.0)
         self.actor.train()
-        return action.squeeze().detach()
+        return action.squeeze(0).cpu().detach()
     
     def store_transition(self, state, action, next_state, reward, done):
         self.memory.store(state, action, next_state, reward, done)

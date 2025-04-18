@@ -1,3 +1,6 @@
+from abc import abstractmethod
+import torch
+
 class AgentAbstract(object):
     def __init__(
             self,
@@ -13,20 +16,28 @@ class AgentAbstract(object):
         self.tau = tau
         self.path = f'models/{name}'
 
+    @abstractmethod
     def select_action(self, state):
-        raise NotImplementedError
+        """Selects an action based on the current state."""
+        pass
     
+    @abstractmethod
     def store_transition(self, state, action, next_state, reward, done):
-        raise NotImplementedError
+        """Stores a transition in the agent's memory."""
+        pass
     
-    def update_network(self, network, target_network):
+    def update_network(self, network: torch.nn.Module, target_network: torch.nn.Module):
+        """Performs a soft update of the target network parameters using tau parameter."""
         for target_param, param in zip(target_network.parameters(), network.parameters()):
             target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
     
+    @abstractmethod
     def train(self):
-        raise NotImplementedError
+        """Trains the agent's models."""
+        pass
     
-    def save_config(self):
+    def save_config(self) -> dict:
+        """Saves the agent's configuration parameters."""
         config = {
             'name': self.path.split('/')[-1],
             'device': self.device,
@@ -36,8 +47,12 @@ class AgentAbstract(object):
         }
         return config
     
+    @abstractmethod
     def save_models(self):
-        raise NotImplementedError
+        """Saves the agent's model weights."""
+        pass
     
+    @abstractmethod
     def load_models(self):
-        raise NotImplementedError
+        """Loads the agent's model weights."""
+        pass

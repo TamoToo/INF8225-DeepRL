@@ -22,24 +22,24 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    testCartPole(device, n_episodes=200)
-    testMountainCar(device, n_episodes=200)
-    testLunarLander(device, n_episodes=200)
+    # testCartPole(device, max_steps=100000)
+    testMountainCar(device, max_steps=100000)
+    # testLunarLander(device, max_steps=100000)
 
 
-def testCartPole(device: torch.device, n_episodes: int = 200):
-    testEnvironmentWithDQN("CartPole-v1", device, n_episodes=n_episodes)
+def testCartPole(device: torch.device, max_steps: int = 100000):
+    testEnvironmentWithDQN("CartPole-v1", device, max_steps=max_steps)
 
-def testMountainCar(device: torch.device, n_episodes: int = 200):
-    testEnvironmentWithDQN("MountainCar-v0", device, n_episodes=n_episodes)
-    testEnvironmentWithDDPG("MountainCarContinuous-v0", device, n_episodes=n_episodes)
+def testMountainCar(device: torch.device, max_steps: int = 100000):
+    testEnvironmentWithDQN("MountainCar-v0", device, max_steps=max_steps)
+    testEnvironmentWithDDPG("MountainCarContinuous-v0", device, max_steps=max_steps)
 
-def testLunarLander(device: torch.device, n_episodes: int = 200):
-    testEnvironmentWithDQN("LunarLander-v2", device, n_episodes=n_episodes)
-    testEnvironmentWithDDPG("LunarLanderContinuous-v2", device, n_episodes=n_episodes)
+def testLunarLander(device: torch.device, max_steps: int = 100000):
+    testEnvironmentWithDQN("LunarLander-v2", device, max_steps=max_steps)
+    testEnvironmentWithDDPG("LunarLanderContinuous-v2", device, max_steps=max_steps)
 
 
-def testEnvironmentWithDQN(env_name: str, device: torch.device, n_episodes: int = 200, model_type: str = "DQN"):
+def testEnvironmentWithDQN(env_name: str, device: torch.device, max_steps: int = 100000, model_type: str = "DQN"):
     env = gym.make(env_name, render_mode="rgb_array")
     env = RecordVideo(
         env,
@@ -57,7 +57,7 @@ def testEnvironmentWithDQN(env_name: str, device: torch.device, n_episodes: int 
         gamma=0.99,
         epsilon_start=0.95,
         epsilon_min=0.01,
-        epsilon_decay=1e-4,
+        epsilon_decay=5e-5,
         tau=0.005,
         lr=1e-3,
         memory_capacity=10000,
@@ -66,13 +66,20 @@ def testEnvironmentWithDQN(env_name: str, device: torch.device, n_episodes: int 
         model_type=model_type
     )
 
+    total_steps = 0
+    episode = 0
+
     reward_logger = RewardLogger()
-    for episode in range(n_episodes):
+    while total_steps < max_steps:
         state, _ = env.reset()
-        total_reward = 0
+
+        episode_reward = 0
+        episode_steps = 0
         done = False
 
         while not done:
+            if total_steps >= max_steps:
+                break
             action = agent.select_action(state)
             next_state, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated
@@ -80,13 +87,18 @@ def testEnvironmentWithDQN(env_name: str, device: torch.device, n_episodes: int 
             agent.store_transition(state, action, next_state, reward, done)
             agent.train()
             state = next_state
-            total_reward += reward
+            episode_reward += reward
+            total_steps += 1
+            episode_steps += 1
 
-        reward_logger.add(total_reward)
+        if episode_steps > 0:
+            reward_logger.add(episode_reward)
+            episode += 1 # Increment completed episode count
 
-        if episode % EPISODES_INTERVAL_OF_PRINT == 0:
-            print(f"Episode {episode + 1}/{n_episodes}, Average Reward: {np.mean(reward_logger.get_rewards()[-EPISODES_INTERVAL_OF_PRINT:]):.2f}, Epsilon: {agent.epsilon:.2f}")
+            if episode % EPISODES_INTERVAL_OF_PRINT == 0:
+                print(f"Episode {episode}, Steps: {total_steps}/{max_steps}, Average Reward: {np.mean(reward_logger.get_rewards()[-EPISODES_INTERVAL_OF_PRINT:]):.2f}, Epsilon: {agent.epsilon:.2f}")
 
+    print(f"\nTraining finished after {total_steps} steps across {episode} episodes.")
     os.makedirs(DQN_FIGURES_DIR, exist_ok=True)
     plot_reward_name = f"{model_type}-{env_name}-Reward"
     reward_logger.plot_rewards(f"{DQN_FIGURES_DIR}{plot_reward_name}.png")
@@ -96,7 +108,7 @@ def testEnvironmentWithDQN(env_name: str, device: torch.device, n_episodes: int 
     agent.save_config()
 
 
-def testEnvironmentWithDDPG(env_name: str, device: torch.device, n_episodes: int = 200, model_type: str = "DDPG"):
+def testEnvironmentWithDDPG(env_name: str, device: torch.device, max_steps: int = 100000, model_type: str = "DDPG"):
     env = gym.make(env_name, render_mode="rgb_array")
     env = RecordVideo(
         env,
@@ -104,9 +116,12 @@ def testEnvironmentWithDDPG(env_name: str, device: torch.device, n_episodes: int
         episode_trigger=lambda episode_id: episode_id % EPISODES_INTERVAL_OF_VIDEO == 0,
         name_prefix=env_name
     )
-    
     env = NumpyToTorch(env, device)
 
+    is_continuous = isinstance(env.action_space, gym.spaces.Box)
+    action_shape = env.action_space.shape if is_continuous else env.action_space.n # Handle discrete vs continuous
+    obs_shape = env.observation_space.shape
+    print(f"Action shape: {action_shape}, Observation shape: {obs_shape}")
     agent = DDPGAgent(
         name=f"DDPG-{env_name}",
         device=device,
@@ -116,33 +131,45 @@ def testEnvironmentWithDDPG(env_name: str, device: torch.device, n_episodes: int
         lr_actor=2.5e-3,
         lr_critic=1e-4,
         memory_capacity=100000,
-        action_space=env.action_space.shape,
-        observation_space=env.observation_space.shape
+        action_space=action_shape,
+        observation_space=obs_shape
     )
 
     reward_logger = RewardLogger()
-    for episode in range(n_episodes):
+    total_steps = 0
+    episode = 0
+
+    while total_steps < max_steps:
         state, _ = env.reset()
-        total_reward = 0
+        episode_reward = 0
+        episode_steps = 0
         done = False
 
         while not done:
+            if total_steps >= max_steps:
+                break
             action = agent.select_action(state)
             # TODO: Add a way to make sure the action is in the valid range for multiple actions dimension env
+            # print(f"Action: {action}")
             next_state, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated
 
             agent.store_transition(state, action, next_state, reward, done)
             agent.train()
             state = next_state
-            total_reward += reward
+            episode_reward += reward
+            total_steps += 1
+            episode_steps += 1
 
-        reward_logger.add(total_reward)
+        if episode_steps > 0:
+            reward_logger.add(episode_reward)
+            episode += 1
 
-        if episode % EPISODES_INTERVAL_OF_PRINT == 0:
-            print(f"Episode {episode}, Average Reward: {np.mean(reward_logger.get_rewards()[-EPISODES_INTERVAL_OF_PRINT:]):.2f}")
+            if episode % EPISODES_INTERVAL_OF_PRINT == 0:
+                print(f"Episode {episode}, Steps: {total_steps}/{max_steps}, Average Reward: {np.mean(reward_logger.get_rewards()[-EPISODES_INTERVAL_OF_PRINT:]):.2f}")
 
 
+    print(f"\nTraining finished after {total_steps} steps across {episode} episodes.")
     os.makedirs(DDPG_FIGURES_DIR, exist_ok=True)
     plot_reward_name = f"{model_type}-{env_name}-Reward"
     reward_logger.plot_rewards(f"{DDPG_FIGURES_DIR}{plot_reward_name}.png")
