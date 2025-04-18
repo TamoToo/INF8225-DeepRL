@@ -23,8 +23,8 @@ def main():
     print(f"Using device: {device}")
 
     # testCartPole(device, max_steps=100000)
-    testMountainCar(device, max_steps=100000)
-    # testLunarLander(device, max_steps=100000)
+    # testMountainCar(device, max_steps=100000)
+    testLunarLander(device, max_steps=1000000)
 
 
 def testCartPole(device: torch.device, max_steps: int = 100000):
@@ -35,12 +35,12 @@ def testMountainCar(device: torch.device, max_steps: int = 100000):
     testEnvironmentWithDDPG("MountainCarContinuous-v0", device, max_steps=max_steps)
 
 def testLunarLander(device: torch.device, max_steps: int = 100000):
-    testEnvironmentWithDQN("LunarLander-v2", device, max_steps=max_steps)
-    testEnvironmentWithDDPG("LunarLanderContinuous-v2", device, max_steps=max_steps)
+    testEnvironmentWithDQN("LunarLander-v3", device, max_steps=max_steps)
+    testEnvironmentWithDDPG("LunarLander-v3", device, max_steps=max_steps, continuous=True)
 
 
-def testEnvironmentWithDQN(env_name: str, device: torch.device, max_steps: int = 100000, model_type: str = "DQN"):
-    env = gym.make(env_name, render_mode="rgb_array")
+def testEnvironmentWithDQN(env_name: str, device: torch.device, max_steps: int = 100000, model_type: str = "DQN", **kwargs):
+    env = gym.make(env_name, render_mode="rgb_array", **kwargs)
     env = RecordVideo(
         env,
         video_folder=DQN_VIDEOS_DIR,
@@ -108,8 +108,8 @@ def testEnvironmentWithDQN(env_name: str, device: torch.device, max_steps: int =
     agent.save_config()
 
 
-def testEnvironmentWithDDPG(env_name: str, device: torch.device, max_steps: int = 100000, model_type: str = "DDPG"):
-    env = gym.make(env_name, render_mode="rgb_array")
+def testEnvironmentWithDDPG(env_name: str, device: torch.device, max_steps: int = 100000, model_type: str = "DDPG", **kwargs):
+    env = gym.make(env_name, render_mode="rgb_array", **kwargs)
     env = RecordVideo(
         env,
         video_folder=DDPG_VIDEOS_DIR,
