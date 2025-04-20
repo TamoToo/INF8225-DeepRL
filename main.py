@@ -1,7 +1,8 @@
 from ddpg.ddpg import Agent as DDPGAgent
 from dqn.dqn import Agent as DQNAgent
 from utils.reward_logger import RewardLogger
-from gymnasium.wrappers import RecordVideo, NumpyToTorch
+from utils.utils import preprocess_state
+from gymnasium.wrappers import RecordVideo, NumpyToTorch, FrameStackObservation
 
 import gymnasium as gym
 import numpy as np
@@ -17,29 +18,33 @@ DDPG_VIDEOS_DIR = "output/videos/ddpg/"
 EPISODES_INTERVAL_OF_PRINT = 10
 EPISODES_INTERVAL_OF_VIDEO = 50
 
-
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
     # testCartPole(device, max_steps=100000)
-    # testMountainCar(device, max_steps=100000)
-    testLunarLander(device, max_steps=1000000)
+    testMountainCar(device, max_steps=100000)
+    # testLunarLander(device, max_steps=1000000)
+    # testRacingCar(device, max_steps=1000000)
 
 
 def testCartPole(device: torch.device, max_steps: int = 100000):
     testEnvironmentWithDQN("CartPole-v1", device, max_steps=max_steps)
 
 def testMountainCar(device: torch.device, max_steps: int = 100000):
-    testEnvironmentWithDQN("MountainCar-v0", device, max_steps=max_steps)
+    # testEnvironmentWithDQN("MountainCar-v0", device, max_steps=max_steps)
     testEnvironmentWithDDPG("MountainCarContinuous-v0", device, max_steps=max_steps)
 
 def testLunarLander(device: torch.device, max_steps: int = 100000):
-    testEnvironmentWithDQN("LunarLander-v3", device, max_steps=max_steps)
+    # testEnvironmentWithDQN("LunarLander-v3", device, max_steps=max_steps, continuous=False)
     testEnvironmentWithDDPG("LunarLander-v3", device, max_steps=max_steps, continuous=True)
 
+def testRacingCar(device: torch.device, max_steps: int = 100000):
+    testEnvironmentWithDQN("CarRacing-v3", device, max_steps=max_steps, model_type="DQN_CNN", start_skip=15, continuous=False)
+    testEnvironmentWithDDPG("CarRacing-v3", device, max_steps=max_steps, model_type="DDPG_CNN", start_skip=15, continuous=True)
 
-def testEnvironmentWithDQN(env_name: str, device: torch.device, max_steps: int = 100000, model_type: str = "DQN", **kwargs):
+
+def testEnvironmentWithDQN(env_name: str, device: torch.device, max_steps: int = 100000, model_type: str = "DQN", start_skip: int = 0, **kwargs):
     env = gym.make(env_name, render_mode="rgb_array", **kwargs)
     env = RecordVideo(
         env,
@@ -47,7 +52,14 @@ def testEnvironmentWithDQN(env_name: str, device: torch.device, max_steps: int =
         episode_trigger=lambda episode_id: episode_id % EPISODES_INTERVAL_OF_VIDEO == 0,
         name_prefix=env_name
     )
+
+    if "CNN" in model_type:
+        env = FrameStackObservation(env, 4) # Stack 4 frames for CNN input
     
+    n_actions, n_observations = env.action_space.n, env.observation_space.shape
+
+    if "CNN" in model_type:
+        n_observations = (n_observations[1], n_observations[2], n_observations[0]) # Change the order of dimensions for CNN input (height, width, frames)
     env = NumpyToTorch(env, device)
 
     agent = DQNAgent(
@@ -59,19 +71,27 @@ def testEnvironmentWithDQN(env_name: str, device: torch.device, max_steps: int =
         epsilon_min=0.01,
         epsilon_decay=5e-5,
         tau=0.005,
-        lr=1e-3,
+        lr=1e-4,
         memory_capacity=10000,
-        action_space=env.action_space.n,
-        observation_space=env.observation_space.shape,
+        action_space=n_actions,
+        observation_space=n_observations,
         model_type=model_type
     )
 
+    reward_logger = RewardLogger()
     total_steps = 0
     episode = 0
 
-    reward_logger = RewardLogger()
     while total_steps < max_steps:
         state, _ = env.reset()
+
+        for _ in range(start_skip):
+            # Take random actions during the skip phase
+            random_action = np.random.randint(n_actions)
+            state, _, _, _, _ = env.step(random_action)
+
+        if "CNN" in model_type:
+            state = preprocess_state(state)
 
         episode_reward = 0
         episode_steps = 0
@@ -83,6 +103,9 @@ def testEnvironmentWithDQN(env_name: str, device: torch.device, max_steps: int =
             action = agent.select_action(state)
             next_state, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated
+
+            if "CNN" in model_type:
+                next_state = preprocess_state(next_state)
 
             agent.store_transition(state, action, next_state, reward, done)
             agent.train()
@@ -108,7 +131,7 @@ def testEnvironmentWithDQN(env_name: str, device: torch.device, max_steps: int =
     agent.save_config()
 
 
-def testEnvironmentWithDDPG(env_name: str, device: torch.device, max_steps: int = 100000, model_type: str = "DDPG", **kwargs):
+def testEnvironmentWithDDPG(env_name: str, device: torch.device, max_steps: int = 100000, model_type: str = "DDPG", start_skip: int = 0, **kwargs):
     env = gym.make(env_name, render_mode="rgb_array", **kwargs)
     env = RecordVideo(
         env,
@@ -116,23 +139,27 @@ def testEnvironmentWithDDPG(env_name: str, device: torch.device, max_steps: int 
         episode_trigger=lambda episode_id: episode_id % EPISODES_INTERVAL_OF_VIDEO == 0,
         name_prefix=env_name
     )
+
+    if "CNN" in model_type:
+        env = FrameStackObservation(env, 4) # Stack 4 frames for CNN input
+    
+    n_actions, n_observations = env.action_space.shape, env.observation_space.shape
+
+    if "CNN" in model_type:
+        n_observations = (n_observations[1], n_observations[2], n_observations[0]) # Change the order of dimensions for CNN input (height, width, frames)
     env = NumpyToTorch(env, device)
 
-    is_continuous = isinstance(env.action_space, gym.spaces.Box)
-    action_shape = env.action_space.shape if is_continuous else env.action_space.n # Handle discrete vs continuous
-    obs_shape = env.observation_space.shape
-    print(f"Action shape: {action_shape}, Observation shape: {obs_shape}")
     agent = DDPGAgent(
         name=f"DDPG-{env_name}",
         device=device,
         batch_size=64,
         gamma=0.99,
-        tau=0.005,
-        lr_actor=2.5e-3,
+        tau=0.001,
+        lr_actor=1e-4,
         lr_critic=1e-4,
         memory_capacity=100000,
-        action_space=action_shape,
-        observation_space=obs_shape
+        action_space=n_actions,
+        observation_space=n_observations
     )
 
     reward_logger = RewardLogger()
@@ -141,6 +168,15 @@ def testEnvironmentWithDDPG(env_name: str, device: torch.device, max_steps: int 
 
     while total_steps < max_steps:
         state, _ = env.reset()
+
+        for _ in range(start_skip):
+            # Take random actions during the skip phase
+            random_action = np.random.randint(n_actions)
+            state, _, _, _, _ = env.step(random_action)
+
+        if "CNN" in model_type:
+            state = preprocess_state(state)
+
         episode_reward = 0
         episode_steps = 0
         done = False
@@ -149,10 +185,17 @@ def testEnvironmentWithDDPG(env_name: str, device: torch.device, max_steps: int 
             if total_steps >= max_steps:
                 break
             action = agent.select_action(state)
-            # TODO: Add a way to make sure the action is in the valid range for multiple actions dimension env
-            # print(f"Action: {action}")
+            # TODO: Add a propper way to make sure the action is in the valid range for multiple actions dimension env
+            if "CarRacing" in env_name:
+                # Make sure the action is in the correct range
+                action[1] = np.clip(action[1], 0, 1) # Gas
+                action[2] = np.clip(action[2], 0, 1) # Breaking
+
             next_state, reward, terminated, truncated, _ = env.step(action)
             done = terminated or truncated
+
+            if "CNN" in model_type:
+                next_state = preprocess_state(next_state)
 
             agent.store_transition(state, action, next_state, reward, done)
             agent.train()
