@@ -22,10 +22,10 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    # testCartPole(device, max_steps=100000)
+    testCartPole(device, max_steps=10000)
     testMountainCar(device, max_steps=100000)
-    # testLunarLander(device, max_steps=1000000)
-    # testRacingCar(device, max_steps=1000000)
+    testLunarLander(device, max_steps=100000)
+    testRacingCar(device, max_steps=100000)
 
 
 def testCartPole(device: torch.device, max_steps: int = 100000):
@@ -36,7 +36,7 @@ def testMountainCar(device: torch.device, max_steps: int = 100000):
     testEnvironmentWithDDPG("MountainCarContinuous-v0", device, max_steps=max_steps)
 
 def testLunarLander(device: torch.device, max_steps: int = 100000):
-    # testEnvironmentWithDQN("LunarLander-v3", device, max_steps=max_steps, continuous=False)
+    testEnvironmentWithDQN("LunarLander-v3", device, max_steps=max_steps, continuous=False)
     testEnvironmentWithDDPG("LunarLander-v3", device, max_steps=max_steps, continuous=True)
 
 def testRacingCar(device: torch.device, max_steps: int = 100000):
@@ -91,7 +91,7 @@ def testEnvironmentWithDQN(env_name: str, device: torch.device, max_steps: int =
             state, _, _, _, _ = env.step(random_action)
 
         if "CNN" in model_type:
-            state = preprocess_state(state)
+            state = preprocess_state(state, device)
 
         episode_reward = 0
         episode_steps = 0
@@ -105,7 +105,7 @@ def testEnvironmentWithDQN(env_name: str, device: torch.device, max_steps: int =
             done = terminated or truncated
 
             if "CNN" in model_type:
-                next_state = preprocess_state(next_state)
+                next_state = preprocess_state(next_state, device)
 
             agent.store_transition(state, action, next_state, reward, done)
             agent.train()
@@ -175,7 +175,7 @@ def testEnvironmentWithDDPG(env_name: str, device: torch.device, max_steps: int 
             state, _, _, _, _ = env.step(random_action)
 
         if "CNN" in model_type:
-            state = preprocess_state(state)
+            state = preprocess_state(state, device)
 
         episode_reward = 0
         episode_steps = 0
@@ -195,7 +195,7 @@ def testEnvironmentWithDDPG(env_name: str, device: torch.device, max_steps: int 
             done = terminated or truncated
 
             if "CNN" in model_type:
-                next_state = preprocess_state(next_state)
+                next_state = preprocess_state(next_state, device)
 
             agent.store_transition(state, action, next_state, reward, done)
             agent.train()
