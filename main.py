@@ -169,6 +169,7 @@ def testEnvironmentWithDDPG(env_name: str, device: torch.device, max_steps: int 
 
     while total_steps < max_steps:
         state, _ = env.reset()
+        agent.action_noise.reset()  # Reset action noise for each episode
 
         for _ in range(start_skip):
             # Take random actions during the skip phase
