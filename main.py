@@ -25,7 +25,7 @@ def main():
     testCartPole(device, max_steps=10000)
     testMountainCar(device, max_steps=100000)
     testLunarLander(device, max_steps=100000)
-    testRacingCar(device, max_steps=100000)
+    testRacingCar(device, max_steps=1000000)
 
 
 def testCartPole(device: torch.device, max_steps: int = 100000):
@@ -48,7 +48,7 @@ def testEnvironmentWithDQN(env_name: str, device: torch.device, max_steps: int =
     env = gym.make(env_name, render_mode="rgb_array", **kwargs)
     env = RecordVideo(
         env,
-        video_folder=DQN_VIDEOS_DIR,
+        video_folder=DQN_VIDEOS_DIR + env_name,
         episode_trigger=lambda episode_id: episode_id % EPISODES_INTERVAL_OF_VIDEO == 0,
         name_prefix=env_name
     )
@@ -135,7 +135,7 @@ def testEnvironmentWithDDPG(env_name: str, device: torch.device, max_steps: int 
     env = gym.make(env_name, render_mode="rgb_array", **kwargs)
     env = RecordVideo(
         env,
-        video_folder=DDPG_VIDEOS_DIR,
+        video_folder=DDPG_VIDEOS_DIR + env_name,
         episode_trigger=lambda episode_id: episode_id % EPISODES_INTERVAL_OF_VIDEO == 0,
         name_prefix=env_name
     )
@@ -152,14 +152,15 @@ def testEnvironmentWithDDPG(env_name: str, device: torch.device, max_steps: int 
     agent = DDPGAgent(
         name=f"DDPG-{env_name}",
         device=device,
-        batch_size=64,
+        batch_size=256,
         gamma=0.99,
         tau=0.001,
-        lr_actor=1e-4,
-        lr_critic=1e-4,
+        lr_actor=1e-5,
+        lr_critic=1e-5,
         memory_capacity=100000,
         action_space=n_actions,
-        observation_space=n_observations
+        observation_space=n_observations,
+        model_type=model_type
     )
 
     reward_logger = RewardLogger()
@@ -171,8 +172,8 @@ def testEnvironmentWithDDPG(env_name: str, device: torch.device, max_steps: int 
 
         for _ in range(start_skip):
             # Take random actions during the skip phase
-            random_action = np.random.randint(n_actions)
-            state, _, _, _, _ = env.step(random_action)
+            random_action = torch.tensor(np.random.uniform(0, 1, n_actions), dtype=torch.float32).to(device) # Random action for car racing env
+            state, _, _, _, _ = env.step(random_action) 
 
         if "CNN" in model_type:
             state = preprocess_state(state, device)
@@ -184,20 +185,20 @@ def testEnvironmentWithDDPG(env_name: str, device: torch.device, max_steps: int 
         while not done:
             if total_steps >= max_steps:
                 break
-            action = agent.select_action(state)
-            # TODO: Add a propper way to make sure the action is in the valid range for multiple actions dimension env
+            raw_action = agent.select_action(state)
+            action_to_env = raw_action.clone()
             if "CarRacing" in env_name:
-                # Make sure the action is in the correct range
-                action[1] = np.clip(action[1], 0, 1) # Gas
-                action[2] = np.clip(action[2], 0, 1) # Breaking
+                # Make sure the action is in the correct range (0, 1) for gas and brake in car racing env
+                action_to_env[1] = (action_to_env[1] + 1.0) / 2.0  # Rescale gas
+                action_to_env[2] = (action_to_env[2] + 1.0) / 2.0  # Rescale brake
 
-            next_state, reward, terminated, truncated, _ = env.step(action)
+            next_state, reward, terminated, truncated, _ = env.step(action_to_env)
             done = terminated or truncated
 
             if "CNN" in model_type:
                 next_state = preprocess_state(next_state, device)
 
-            agent.store_transition(state, action, next_state, reward, done)
+            agent.store_transition(state, raw_action, next_state, reward, done)
             agent.train()
             state = next_state
             episode_reward += reward

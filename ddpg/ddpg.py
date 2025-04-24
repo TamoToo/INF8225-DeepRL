@@ -99,6 +99,7 @@ class Agent(AgentAbstract):
         critic_loss = self.loss(current_q, target_q)
         self.critic_optimizer.zero_grad()
         critic_loss.backward()
+        nn.utils.clip_grad_norm_(self.critic.parameters(), 1) # Gradient clipping
         self.critic_optimizer.step()
 
         # Actor update
@@ -107,6 +108,7 @@ class Agent(AgentAbstract):
         actor_loss = -self.critic(states, self.actor(states)).mean()
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
+        nn.utils.clip_grad_norm_(self.actor.parameters(), 1) # Gradient clipping
         self.actor_optimizer.step()
 
         # Soft update of the target networks
@@ -149,6 +151,20 @@ class Agent(AgentAbstract):
         self.actor_target.train()
         self.critic.train()
         self.critic_target.train()
+
+    def print_parameters(self):
+        """Prints the hyperparameters of the agent."""
+        print("Agent Parameters:")
+        print(f"  Device: {self.device}")
+        print(f"  Batch Size: {self.batch_size}")
+        print(f"  Gamma (Discount Factor): {self.gamma}")
+        print(f"  Tau (Soft Update): {self.tau}")
+        print(f"  Actor Learning Rate: {self.lr_actor}")
+        print(f"  Critic Learning Rate: {self.lr_critic}")
+        print(f"  Memory Capacity: {self.memory_capacity}")
+        print(f"  Action Space: {self.action_dim}")
+        print(f"  Observation Space: {self.obs_dim}")
+        print("-" * 30)
 
     
     @staticmethod

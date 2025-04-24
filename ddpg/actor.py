@@ -56,9 +56,9 @@ class ActorCNN(nn.Module):
         self.n_frames = frames
 
         self.conv_layers = nn.Sequential(
-            nn.Conv2d(frames, 32, kernel_size=8, stride=4),
+            nn.Conv2d(frames, 16, kernel_size=8, stride=4),
             nn.ReLU(),
-            nn.Conv2d(32, 32, kernel_size=4, stride=2),
+            nn.Conv2d(16, 32, kernel_size=4, stride=2),
             nn.ReLU(),
             nn.Conv2d(32, 32, kernel_size=3, stride=1),
             nn.ReLU(),
@@ -69,8 +69,10 @@ class ActorCNN(nn.Module):
 
         self.fc_layers = nn.Sequential(
             nn.Linear(conv_output_size, hidden_fc_dim),
+            nn.LayerNorm(hidden_fc_dim),
             nn.ReLU(),
             nn.Linear(hidden_fc_dim, hidden_fc_dim),
+            nn.LayerNorm(hidden_fc_dim),
             nn.ReLU(),
             nn.Linear(hidden_fc_dim, self.action_space),
             nn.Tanh()
@@ -83,8 +85,8 @@ class ActorCNN(nn.Module):
 
         # Initialize weights for fully connected layers
         init_weights(self.fc_layers[0])
-        init_weights(self.fc_layers[2])
-        init_weights(self.fc_layers[4], last_layer=True)
+        init_weights(self.fc_layers[3])
+        init_weights(self.fc_layers[6], last_layer=True)
 
 
     def _get_conv_output_size(self, shape):

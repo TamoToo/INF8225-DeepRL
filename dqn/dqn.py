@@ -122,6 +122,19 @@ class Agent(AgentAbstract):
         self.q_network.train()
         self.target_network.train()
 
+    def print_parameters(self):
+        print(f"Agent Parameters:")
+        print(f"  Device: {self.device}")
+        print(f"  Batch Size: {self.batch_size}")
+        print(f"  Gamma: {self.gamma}")
+        print(f"  Epsilon Start: {self.epsilon_start}")
+        print(f"  Epsilon Min: {self.epsilon_min}")
+        print(f"  Epsilon Decay: {self.epsilon_decay}")
+        print(f"  Tau: {self.tau}")
+        print(f"  Learning Rate: {self.lr}")
+        print(f"  Memory Capacity: {self.memory_capacity}")
+        print(f"  Action Space: {self.action_dim}")
+        print(f"  Observation Space: {self.obs_dim}")
 
     @staticmethod
     def load_agent(name, device, eval_mode=True):

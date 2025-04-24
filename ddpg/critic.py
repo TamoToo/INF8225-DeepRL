@@ -57,9 +57,9 @@ class CriticCNN(nn.Module):
         self.n_frames = frames
 
         self.conv_layers = nn.Sequential(
-            nn.Conv2d(frames, 32, kernel_size=8, stride=4),
+            nn.Conv2d(frames, 16, kernel_size=8, stride=4),
             nn.ReLU(),
-            nn.Conv2d(32, 32, kernel_size=4, stride=2),
+            nn.Conv2d(16, 32, kernel_size=4, stride=2),
             nn.ReLU(),
             nn.Conv2d(32, 32, kernel_size=3, stride=1),
             nn.ReLU(),
@@ -68,7 +68,9 @@ class CriticCNN(nn.Module):
         conv_output_size = self._get_conv_output_size((frames, height, width))
 
         self.fc1 = nn.Linear(conv_output_size, hidden_fc_dim)
+        self.bn1 = nn.LayerNorm(hidden_fc_dim)
         self.fc2 = nn.Linear(hidden_fc_dim + action_space, hidden_fc_dim)
+        self.bn2 = nn.LayerNorm(hidden_fc_dim)
         self.fc3 = nn.Linear(hidden_fc_dim, 1)
 
         # Initialize weights for convolutional layers
@@ -96,7 +98,7 @@ class CriticCNN(nn.Module):
             state = state.permute(0, 3, 1, 2)
 
         conv_output = self.conv_layers(state)
-        state_value = F.relu(self.fc1(conv_output))
-        action_value = F.relu(self.fc2(torch.cat([state_value, action], dim=1)))
+        state_value = F.relu(self.bn1(self.fc1(conv_output)))
+        action_value = F.relu(self.bn2(self.fc2(torch.cat([state_value, action], dim=1))))
         q_value = self.fc3(action_value)
         return q_value
