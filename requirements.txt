@@ -1,0 +1,7 @@
+torch
+numpy
+swig
+matplotlib
+gymnasium==1.1.1
+gymnasium[box2d]==1.1.1
+gymnasium[other]==1.1.1
