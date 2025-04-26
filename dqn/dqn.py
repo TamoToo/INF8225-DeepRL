@@ -135,12 +135,13 @@ class Agent(AgentAbstract):
         print(f"  Memory Capacity: {self.memory_capacity}")
         print(f"  Action Space: {self.action_dim}")
         print(f"  Observation Space: {self.obs_dim}")
+        print("-" * 30)
 
     @staticmethod
     def load_agent(name, device, eval_mode=True):
         """Load agent from saved configuration"""
         path = f'models/{name}'
-        config = torch.load(f'{path}_config.pth')
+        config = torch.load(f'{path}_config.pth', weights_only=False)
         
         agent = Agent(
             name=config['name'],
