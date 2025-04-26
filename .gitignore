@@ -1,7 +1,7 @@
 __pycache__
+models/
+output/figures/compare/
 output/figures/ddpg/
 output/figures/dqn/
 output/videos/ddpg/
 output/videos/dqn/
-
-models/

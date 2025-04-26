@@ -33,3 +33,14 @@ class RewardLogger(object):
         plt.ylabel("Reward")
         plt.grid(True)
         plt.savefig(file_name)
+
+    def plot_multiple_rewards_smooth(self, rewards_lists, file_name, window_length=50, figsize=(10, 5)):
+        plt.figure(figsize=figsize)
+        for rewards in rewards_lists:
+            moving_average = np.convolve(rewards, np.ones(window_length) / window_length, mode="valid")
+            plt.plot(moving_average)
+        plt.title(f'Running Average Reward ({window_length} episodes)')
+        plt.xlabel("Episode #")
+        plt.ylabel("Reward")
+        plt.grid(True)
+        plt.savefig(file_name)

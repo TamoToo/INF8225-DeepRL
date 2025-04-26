@@ -10,6 +10,7 @@ import torch
 
 import os
 
+COMPARE_FIGURES_DIR = "output/figures/compare/"
 DQN_FIGURES_DIR = "output/figures/dqn/"
 DDPG_FIGURES_DIR = "output/figures/ddpg/"
 DQN_VIDEOS_DIR = "output/videos/dqn/"
@@ -32,16 +33,42 @@ def testCartPole(device: torch.device, max_steps: int = 100000):
     testEnvironmentWithDQN("CartPole-v1", device, max_steps=max_steps)
 
 def testMountainCar(device: torch.device, max_steps: int = 100000):
-    # testEnvironmentWithDQN("MountainCar-v0", device, max_steps=max_steps)
-    testEnvironmentWithDDPG("MountainCarContinuous-v0", device, max_steps=max_steps)
+    rewards_ddpg = testEnvironmentWithDDPG("MountainCarContinuous-v0", device, max_steps=max_steps)
+    rewards_dqn = testEnvironmentWithDQN("MountainCar-v0", device, max_steps=max_steps)
+    
+    os.makedirs(COMPARE_FIGURES_DIR, exist_ok=True)
+    RewardLogger().plot_multiple_rewards_smooth(
+        [rewards_dqn, rewards_ddpg],
+        file_name=f"{COMPARE_FIGURES_DIR}MountainCar.png",
+        window_length=50,
+        figsize=(10, 5)
+    )
+
 
 def testLunarLander(device: torch.device, max_steps: int = 100000):
-    testEnvironmentWithDQN("LunarLander-v3", device, max_steps=max_steps, continuous=False)
-    testEnvironmentWithDDPG("LunarLander-v3", device, max_steps=max_steps, continuous=True)
+    rewards_dqn = testEnvironmentWithDQN("LunarLander-v3", device, max_steps=max_steps, continuous=False)
+    rewards_ddpg = testEnvironmentWithDDPG("LunarLander-v3", device, max_steps=max_steps, continuous=True)
+
+    os.makedirs(COMPARE_FIGURES_DIR, exist_ok=True)
+    RewardLogger().plot_multiple_rewards_smooth(
+        [rewards_dqn, rewards_ddpg],
+        file_name=f"{COMPARE_FIGURES_DIR}LunarLander.png",
+        window_length=50,
+        figsize=(10, 5)
+    )
+
 
 def testRacingCar(device: torch.device, max_steps: int = 100000):
-    testEnvironmentWithDQN("CarRacing-v3", device, max_steps=max_steps, model_type="DQN_CNN", start_skip=15, continuous=False)
-    testEnvironmentWithDDPG("CarRacing-v3", device, max_steps=max_steps, model_type="DDPG_CNN", start_skip=15, continuous=True)
+    rewards_dqn = testEnvironmentWithDQN("CarRacing-v3", device, max_steps=max_steps, model_type="DQN_CNN", start_skip=15, continuous=False)
+    rewards_ddpg = testEnvironmentWithDDPG("CarRacing-v3", device, max_steps=max_steps, model_type="DDPG_CNN", start_skip=15, continuous=True)
+    
+    os.makedirs(COMPARE_FIGURES_DIR, exist_ok=True)
+    RewardLogger().plot_multiple_rewards_smooth(
+        [rewards_dqn, rewards_ddpg],
+        file_name=f"{COMPARE_FIGURES_DIR}CarRacing.png",
+        window_length=50,
+        figsize=(10, 5)
+    )
 
 
 def testEnvironmentWithDQN(env_name: str, device: torch.device, max_steps: int = 100000, model_type: str = "DQN", start_skip: int = 0, **kwargs):
@@ -129,6 +156,8 @@ def testEnvironmentWithDQN(env_name: str, device: torch.device, max_steps: int =
 
     agent.save_models()
     agent.save_config()
+    
+    return reward_logger.rewards
 
 
 def testEnvironmentWithDDPG(env_name: str, device: torch.device, max_steps: int = 100000, model_type: str = "DDPG", start_skip: int = 0, **kwargs):
@@ -222,6 +251,8 @@ def testEnvironmentWithDDPG(env_name: str, device: torch.device, max_steps: int 
 
     agent.save_models()
     agent.save_config()
+
+    return reward_logger.rewards
 
 
 if __name__ == "__main__":
