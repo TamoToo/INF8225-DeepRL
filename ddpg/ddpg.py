@@ -171,7 +171,7 @@ class Agent(AgentAbstract):
     def load_agent(name, device, eval_mode=True):
         """Load agent from saved configuration"""
         path = f'models/{name}'
-        config = torch.load(f'{path}_config.pth')
+        config = torch.load(f'{path}_config.pth', weights_only=False)
         
         agent = Agent(
             model_type=config['model_type'],
