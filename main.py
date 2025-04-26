@@ -24,17 +24,17 @@ def main():
     print(f"Using device: {device}")
 
     testCartPole(device, max_steps=10000)
-    testMountainCar(device, max_steps=100000)
-    testLunarLander(device, max_steps=100000)
-    testRacingCar(device, max_steps=1000000)
+    testMountainCar(device, max_steps=250000)
+    testLunarLander(device, max_steps=1000000)
+    testRacingCar(device, max_steps=250000)
 
 
 def testCartPole(device: torch.device, max_steps: int = 100000):
     testEnvironmentWithDQN("CartPole-v1", device, max_steps=max_steps)
 
 def testMountainCar(device: torch.device, max_steps: int = 100000):
-    rewards_ddpg = testEnvironmentWithDDPG("MountainCarContinuous-v0", device, max_steps=max_steps)
     rewards_dqn = testEnvironmentWithDQN("MountainCar-v0", device, max_steps=max_steps)
+    rewards_ddpg = testEnvironmentWithDDPG("MountainCarContinuous-v0", device, max_steps=max_steps)
     
     os.makedirs(COMPARE_FIGURES_DIR, exist_ok=True)
     RewardLogger().plot_multiple_rewards_smooth(
