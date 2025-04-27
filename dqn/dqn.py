@@ -9,7 +9,6 @@ import torch.optim as optim
 
 import os
 
-
 class Agent(AgentAbstract):
     def __init__(
             self,
@@ -54,7 +53,6 @@ class Agent(AgentAbstract):
         self.loss = nn.MSELoss()
         self.memory = ReplayBuffer(self.memory_capacity, self.obs_dim, self.action_dim)
 
-
     def select_action(self, state, eval_mode=False):
         if not eval_mode and np.random.rand() < self.epsilon:
             return torch.tensor(np.random.choice(self.action_dim))
@@ -83,8 +81,6 @@ class Agent(AgentAbstract):
         self.optimizer.step()
 
         self.update_epsilon()
-
-        # Soft update of the target network weights
         self.update_network(self.q_network, self.target_network)
 
     def update_epsilon(self):

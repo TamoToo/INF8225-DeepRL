@@ -2,7 +2,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-
 class DQN(nn.Module):
     def __init__(
             self,
@@ -22,7 +21,6 @@ class DQN(nn.Module):
 
     def forward(self, x):
         return self.network(x)
-
 
 class DQN_CNN(nn.Module):
     def __init__(self, action_space: int, observation_space: int):
@@ -52,7 +50,6 @@ class DQN_CNN(nn.Module):
         o = self.conv_layers(o)
 
         return int(np.prod(o.shape))
-    
 
     def forward(self, x):
         # Input expected in shape (batch, height, width, frames)
@@ -62,5 +59,4 @@ class DQN_CNN(nn.Module):
 
         x = self.conv_layers(x)
         x = self.fc_layers(x)
-
         return x

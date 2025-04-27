@@ -44,7 +44,6 @@ def testMountainCar(device: torch.device, max_steps: int = 100000):
         figsize=(10, 5)
     )
 
-
 def testLunarLander(device: torch.device, max_steps: int = 100000):
     rewards_dqn = testEnvironmentWithDQN("LunarLander-v3", device, max_steps=max_steps, continuous=False)
     rewards_ddpg = testEnvironmentWithDDPG("LunarLander-v3", device, max_steps=max_steps, continuous=True)
@@ -57,7 +56,6 @@ def testLunarLander(device: torch.device, max_steps: int = 100000):
         figsize=(10, 5)
     )
 
-
 def testRacingCar(device: torch.device, max_steps: int = 100000):
     rewards_dqn = testEnvironmentWithDQN("CarRacing-v3", device, max_steps=max_steps, model_type="DQN_CNN", start_skip=15, continuous=False)
     rewards_ddpg = testEnvironmentWithDDPG("CarRacing-v3", device, max_steps=max_steps, model_type="DDPG_CNN", start_skip=15, continuous=True)
@@ -69,7 +67,6 @@ def testRacingCar(device: torch.device, max_steps: int = 100000):
         window_length=50,
         figsize=(10, 5)
     )
-
 
 def testEnvironmentWithDQN(env_name: str, device: torch.device, max_steps: int = 100000, model_type: str = "DQN", start_skip: int = 0, **kwargs):
     env = gym.make(env_name, render_mode="rgb_array", **kwargs)
@@ -158,7 +155,6 @@ def testEnvironmentWithDQN(env_name: str, device: torch.device, max_steps: int =
     agent.save_config()
     
     return reward_logger.rewards
-
 
 def testEnvironmentWithDDPG(env_name: str, device: torch.device, max_steps: int = 100000, model_type: str = "DDPG", start_skip: int = 0, **kwargs):
     env = gym.make(env_name, render_mode="rgb_array", **kwargs)

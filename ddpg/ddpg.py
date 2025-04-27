@@ -11,7 +11,6 @@ import torch.optim as optim
 
 import os
 
-
 class Agent(AgentAbstract):
     def __init__(
         self,
@@ -52,8 +51,6 @@ class Agent(AgentAbstract):
             self.critic = CriticCNN(action_space, observation_space).to(self.device)
             self.critic_target = CriticCNN(action_space, observation_space).to(self.device)
 
-
-        # FORGOT THIS, MIGHT BE THE PROBLEM: Initialize the target networks with the same weights as the main networks
         self.actor_target.load_state_dict(self.actor.state_dict())
         self.critic_target.load_state_dict(self.critic.state_dict())
 
@@ -68,7 +65,6 @@ class Agent(AgentAbstract):
     def select_action(self, state):
         self.actor.eval()
         state = state.unsqueeze(0).to(self.device)
-        # state = state.to(self.device)
         action = self.actor(state)
         action += torch.tensor(self.action_noise.sample(), dtype=torch.float32).to(self.device)
 

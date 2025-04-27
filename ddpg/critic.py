@@ -4,7 +4,6 @@ import torch.nn.functional as F
 import torch
 from utils.init_weights import init_weights
 
-
 class Critic(nn.Module):
     def __init__(
         self,
@@ -41,7 +40,6 @@ class Critic(nn.Module):
         q_value = self.fc3(action_value)
 
         return q_value
-    
 
 class CriticCNN(nn.Module):
     def __init__(
